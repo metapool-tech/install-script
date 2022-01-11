@@ -5,6 +5,7 @@ set -e
 PROXY_VERSION=0.2.2
 MINER_VERSION=0.5.4
 MINER_VERSION_AMD=0.2.0
+SCRIPT_VERSION=1.0.0
 
 DIR=$(pwd)
 PKG_MANAGER=""
@@ -12,6 +13,8 @@ PKG_MANAGER=""
 GREEN="\e[0;92m"
 YELLOW="\e[0;93m"
 RESET="\e[0m"
+
+echo -e "script version: ${SCRIPT_VERSION}"
 
 if [[ ! -f config.json ]] || [[ "$1" == "-r" ]]; then
 
