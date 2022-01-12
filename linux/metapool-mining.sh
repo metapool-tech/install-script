@@ -5,7 +5,7 @@ set -e
 PROXY_VERSION=0.2.2
 MINER_VERSION=0.5.4
 MINER_VERSION_AMD=0.2.0
-SCRIPT_VERSION=1.0.0
+SCRIPT_VERSION=1.0.1
 
 DIR=$(pwd)
 PKG_MANAGER=""
@@ -60,6 +60,7 @@ echo -e ""
 
 cat <<EOT > config.json
 {
+    "logPath": "./logs/",
     "diff1TargetNumZero": 30,
     "serverHost": "eu.metapool.tech",
     "serverPort": 20032,
