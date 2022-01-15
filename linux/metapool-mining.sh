@@ -2,10 +2,10 @@
 # Made by opimon, svenhash
 set -e
 
-PROXY_VERSION=0.2.2
+PROXY_VERSION=1.0.1
 MINER_VERSION=0.5.4
 MINER_VERSION_AMD=0.2.0
-SCRIPT_VERSION=1.0.1
+SCRIPT_VERSION=1.2.0
 
 DIR=$(pwd)
 PKG_MANAGER=""
@@ -14,9 +14,9 @@ GREEN="\e[0;92m"
 YELLOW="\e[0;93m"
 RESET="\e[0m"
 
+echo -e ""
 echo -e "script version: ${SCRIPT_VERSION}"
 
-if [[ ! -f config.json ]] || [[ "$1" == "-r" ]]; then
 
 if ! command -v wget &> /dev/null; then
 
@@ -58,6 +58,8 @@ wget -q https://github.com/alephium/mining-proxy/releases/download/v${PROXY_VERS
 
 echo -e ""
 
+if [[ ! -f config.json ]] || [[ "$1" == "-r" ]]; then
+
 cat <<EOT > config.json
 {
     "logPath": "./logs/",
@@ -65,21 +67,19 @@ cat <<EOT > config.json
     "serverHost": "eu.metapool.tech",
     "serverPort": 20032,
     "proxyPort": 30032,
-    "addresses": [
-    "your-mining-address-1",
-    "your-mining-address-2",
-    "your-mining-address-3",
-    "your-mining-address-4"
-  ]
+    "workerName": "",
+    "address": "your-mining-address"
 }
 EOT
+fi
 
 cat << EOT > metapool-run.sh
 #!/usr/bin/env bash
 set -e
 
-DIR=\$(pwd)
+DIR=$(pwd)
 RED="\e[0;91m"
+GREEN="\e[0;92m"
 RESET="\e[0m"
 
 if [[ ! -f config.json ]]
@@ -88,9 +88,22 @@ then
    exit 1
 fi
 
+if [[ \$1 == "-a" ]] && [ ! -z \$2 ]; then
+   ADDR="\$2"
+   echo -e "\${GREEN}New address: \$2\${RESET}"
+   sed -i 's/\"address\".*/\"address\": \"'\${ADDR}'\"/ig' config.json
+
+   if grep -q -wi ".*addresses.*" \$DIR/config.json; then   
+      NEW_CONFIG=\$(jq '(del(.addresses))' config.json) 
+      NEW_CONFIG=\$(jq '.+ {"address": "'\${ADDR}'"}' <<<\$NEW_CONFIG)
+      echo \$NEW_CONFIG|jq > \$DIR/config.json 
+   fi
+
+
+fi
 
 if grep -q -wi ".*your-mining.*" \$DIR/config.json; then
-   echo -e "\${RED}Error: Miner addresses are not set"
+   echo -e "\${RED}Error: Address is not set"
    echo -e "\${RED}Set your mining addresses in \$DIR/config.json \${RESET}"
    exit 1
 fi
@@ -107,10 +120,8 @@ EOT
 
 chmod +x alephium* metapool-run.sh
 
-fi
-
 if grep -q -wi ".*your-mining.*" $DIR/config.json; then
-   echo -e "${YELLOW}Set your mining addresses in $DIR/config.json${RESET}"
+   echo -e "${YELLOW}Set your address with ./metapool-run.sh -a <your address>${RESET}"
    echo -e ""
 fi
 
