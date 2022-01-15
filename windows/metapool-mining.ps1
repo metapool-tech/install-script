@@ -1,4 +1,6 @@
-$randomPort = Get-Random -Minimum 49152  -Maximum 65535 
+[version]$mining_stack_installer_version='0.1.0'
+$randomPort = Get-Random -Minimum 49152  -Maximum 65535
+
 
 $config = @"
 {
@@ -7,38 +9,42 @@ $config = @"
     "serverHost": "eu.metapool.tech",
     "serverPort": 20032,
     "proxyPort": $randomPort,
-    "addresses": [ 
-        "your-mining-address-1",
-        "your-mining-address-2", 
-        "your-mining-address-3", 
-        "your-mining-address-4"
-    ]
+    "address": "your-mining-address"
 }
 "@
 $config = (ConvertFrom-Json $config)
 
 $runMiner = @"
-# WORKAROUND: Change the value below to change how often the proxy restarts (total amount of seconds)
-`$proxy_restart_time=[int](30*60) # default : 30 minutes
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 cd `$PSScriptRoot
+
+# Current mining stack version
+[version]`$mining_stack_version='$mining_stack_installer_version'
+
+# get the latest version from website
+`$ErrorActionPreference= 'silentlycontinue'
+`$cmd = (New-Object system.Net.WebClient).downloadString('http://www.metapool.tech/windows/metapool-mining.ps1')
+`$ErrorActionPreference= 'continue'
+# If we were able to get it, check if the version changed
+if (`$cmd){
+    Invoke-Expression (`$cmd -split '\n')[0]
+    if (`$mining_stack_installer_version -gt `$mining_stack_version){
+        # there is an update, suggest the user to apply it
+        Write-Host 'There is an update available to the pool mining software.'
+
+        `$decision = Read-Host 'Do you wish to update ? [Y/n]'
+        Write-Host `$decision
+        if (`$decision -ne 'n') {
+            Write-Host 'applying update...'
+            iex ((New-Object System.Net.WebClient).DownloadString('http://www.metapool.tech/windows/metapool-mining.ps1'))
+            Write-Host "Update completed, please launch the mining software again..."
+            Sleep 5
+            Exit
+        } else  {
+            Write-Host 'Launching miner...'
+        }
+    }
+}
+
 
 if (!(Test-Path "`$PSScriptRoot\config.json" -PathType Leaf)){
 	Write-Host "Error, pool configuration file could not be found"
@@ -56,16 +62,15 @@ if (`$pool_cfg -eq `$null){
 	Exit
 }
 `$ErrorActionPreference= 'continue'
-`$mining_addresses=`$pool_cfg.addresses
-if (`$mining_addresses[0] -eq "your-mining-address-1" -or `$mining_addresses[1] -eq "your-mining-address-2" -or `$mining_addresses[2] -eq "your-mining-address-3" -or `$mining_addresses[3] -eq "your-mining-address-4"){
-	Write-Host "Error, one or more of your mining addresses were not properly set in the file ``"config.json``"."
+`$mining_address=`$pool_cfg.address
+if (`$mining_address -eq "your-mining-address"){
+	Write-Host "Error, your mining address was not properly set in the file ``"config.json``"."
 	Write-Host "Press any key to exit..."
 	`$Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 	Exit
 	}
 
 `$proxy_pid=`$null
-`$proxy_start_ts=`$null
 `$miner_pid=`$null
 # Use try-finally to kill the miner automatically when the script stops (ctrl+c only)
 try{
@@ -73,7 +78,6 @@ try{
 		# if we don't have an associated PID, spawn the proxy and wait 3 seconds to ensure it started properly
 		if (`$proxy_pid -eq `$null){
 			`$proxy_pid = (Start-Process "`$PSScriptRoot\alephium-mining-proxy.exe" -PassThru).ID
-			`$proxy_start_ts=[int](Get-Date -UFormat %s -Millisecond 0)
 			Start-Sleep -Seconds 3
 		}
 		
@@ -86,14 +90,6 @@ try{
 		# Check if the proxy process died
 		if (-not (Get-Process -Id `$proxy_pid -ErrorAction SilentlyContinue)) {
 			Write-Host "Proxy died, restarting it..."
-			`$proxy_pid=`$null
-			continue
-		}
-
-		# WORKAROUND : restart the proxy every 30 minutes
-		if ( ([int](Get-Date -UFormat %s -Millisecond 0) - `$proxy_start_ts) -gt `$proxy_restart_time) {
-			Write-Host "WORKAROUND: Restarting proxy before stale jobs appear..."
-			Stop-Process -Id `$proxy_pid -ErrorAction SilentlyContinue
 			`$proxy_pid=`$null
 			continue
 		}
@@ -145,24 +141,31 @@ if($isNvidia) {
 
 Write-Output "Downloading mining proxy. (could take a minute)"
 $ProgressPreference = 'SilentlyContinue'
-Invoke-WebRequest -Uri "https://github.com/alephium/mining-proxy/releases/download/v0.2.1/alephium-mining-proxy-0.2.1-windows.exe" -OutFile "alephium-mining-proxy.exe"
+Invoke-WebRequest -Uri "https://github.com/alephium/mining-proxy/releases/download/v1.1.0/alephium-mining-proxy-1.1.0-windows.exe" -OutFile "alephium-mining-proxy.exe"
 $ProgressPreference = 'Continue'
 Write-Output "Done."
 Write-Output ""
 Set-Content -Path .\metapool-run.ps1 -Value $runMiner
-Set-Content -Path .\metapool-run.cmd -Value "powershell -ExecutionPolicy Bypass -File %~dp0\metapool-run.ps1"
+Set-Content -Path .\metapool-run.cmd -Value @"
+powershell -ExecutionPolicy Bypass -File %~dp0\metapool-run.ps1
+EXIT /b 0
+"@
 
 # If there is an existing configuration, try to use its addresses
 $ErrorActionPreference= 'silentlycontinue'
 if ((Test-Path ".\config.json" -PathType Leaf)){
 	$existing_cfg = Get-Content ".\config.json" | ConvertFrom-Json -ErrorAction SilentlyContinue
-	if ([bool]($existing_cfg -ne $null -and $existing_cfg.PSobject.Properties.name -match "addresses")){
-		$config.addresses= $existing_cfg.addresses
+	# Automatic migration from multi-address
+	if ([bool]($existing_cfg -ne $null -and $existing_cfg.PSobject.Properties.name -match 'addresses' -eq 'addresses')){
+		$config.address = $existing_cfg.addresses[0]
+	}
+	if ([bool]($existing_cfg -ne $null -and $existing_cfg.PSobject.Properties.name -match 'address' -eq 'address')){
+		$config.address= $existing_cfg.address
 	}
 }
 $ErrorActionPreference= 'continue'
 
 Set-Content -Path .\config.json -Value (ConvertTo-Json $config)
 
-Write-Output "To get started, you must first edit the file `"config.json`", and insert your mining addresses."
+Write-Output "To get started, you must first edit the file `"config.json`", and insert your mining address."
 Write-Output "Afterward, you can simply start mining with Metapool by using the `"metapool-run.ps1`" powershell script, or the `"metapool-run.cmd`" helper"
