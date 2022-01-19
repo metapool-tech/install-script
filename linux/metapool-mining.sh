@@ -53,12 +53,12 @@ cat <<EOT > ${BZMINER_FOLDER}/config.txt
 {
     "pool_configs": [{
             "algorithm": "alph",
-            "wallet": ["your-mining-address"], // replace 0000 with your own wallet addresses
-            "url": ["stratum+tcp://eu.metapool.tech:20032"], // replace with the pool you wish to mine to. Add multiple pools for failsafe when a pool fails
+            "wallet": [ "your-mining-address" ], 
+            "url": ["stratum+tcp://eu.metapool.tech:20032"], 
             "username": "worker_name",
             "lhr_only": false
         }],
-    "pool": [0], // pool config you wish to use by default when device_overrides does not specify
+    "pool": [0], 
     "rig_name": "rig",
     "log_file": "",
     "nvidia_only": false,
@@ -91,7 +91,7 @@ fi
 if [[ \$1 == "-a" ]] && [ ! -z \$2 ]; then
    ADDR="\$2"
    echo -e "\${GREEN}Address: \$2\${RESET}"
-   sed -i 's/\"wallet\".*/\"wallet\": [\"'\${ADDR}'\"]/ig' config.txt
+   sed -i 's/\"wallet\".*/\"wallet\": [\"'\${ADDR}'\"],/ig' config.txt
 fi
 
 if grep -q -wi ".*your-mining.*" \$DIR/config.txt; then
