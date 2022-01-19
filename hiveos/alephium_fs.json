@@ -7,8 +7,10 @@
             "wal_id": 5199775,
             "dpool_ssl": false,
             "miner": "bzminer",
+            "miner_alt": "ver. 7.1.5",
             "miner_config": {
                 "url": "stratum+tcp://eu.metapool.tech:20032",
+                "ver": "7.1.5",
                 "algo": "alph",
                 "template": "%WAL%"
             },
