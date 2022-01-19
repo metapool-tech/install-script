@@ -42,7 +42,8 @@ if ! command -v curl &> /dev/null; then
 fi
 
 mkdir ${BZMINER_FOLDER}
-curl -fsSL https://www.bzminer.com/downloads/bzminer_v${BZMINER_VERSION}_linux.tar.gz | tar -xvz -C ${BZMINER_FOLDER}
+echo -e "Downloading bzminer v${BZMINER_VERSION}
+curl -fsSL https://www.bzminer.com/downloads/bzminer_v${BZMINER_VERSION}_linux.tar.gz | tar -xvf -C ${BZMINER_FOLDER}
 
 echo -e ""
 
