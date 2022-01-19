@@ -7,7 +7,7 @@ SCRIPT_VERSION=1.3.0
 
 DIR=$(pwd)
 PKG_MANAGER=""
-BZMINER_FOLDER=$DIR/bzminerv${BZMINER_VERSION}
+BZMINER_FOLDER=$DIR/bzminer${BZMINER_VERSION}
 
 GREEN="\e[0;92m"
 YELLOW="\e[0;93m"
@@ -15,7 +15,6 @@ RESET="\e[0m"
 
 echo -e ""
 echo -e "script version: ${SCRIPT_VERSION}"
-
 
 if ! command -v curl &> /dev/null; then
 
@@ -43,11 +42,11 @@ if ! command -v curl &> /dev/null; then
 fi
 
 mkdir ${BZMINER_FOLDER}
-wget https://www.bzminer.com/downloads/bzminer_v${BZMINER_VERSION}_linux.tar.gz | tar -xz -C ${BZMINER_FOLDER}
+curl https://www.bzminer.com/downloads/bzminer_v${BZMINER_VERSION}_linux.tar.gz | tar -xz -C ${BZMINER_FOLDER}
 
 echo -e ""
 
-if [[ ! -f ${BZMINER_FOLDER}/config.txt ]] || [[ "$1" == "-r" ]]; then
+if [[ ! -f config.txt ]] || [[ "$1" == "-r" ]]; then
 
 cat <<EOT > ${BZMINER_FOLDER}/config.txt
 {
@@ -73,7 +72,7 @@ cat <<EOT > ${BZMINER_FOLDER}/config.txt
 EOT
 fi
 
-cat << EOT > ${BZMINER_FOLDER}/metapool-run.sh
+cat << EOT > metapool-run.sh
 #!/usr/bin/env bash
 set -e
 
@@ -82,38 +81,40 @@ RED="\e[0;91m"
 GREEN="\e[0;92m"
 RESET="\e[0m"
 
-if [[ ! -f config.txt ]]
+if [[ ! -f  \$DIR/bzminer${BZMINER_VERSION}/config.txt ]]
 then
-   echo -e "\${RED}Error: \$DIR/config.txt not found\${RESET}"
+   echo -e "\${RED}Error: \$DIR/bzminer${BZMINER_VERSION}/config.txt not found\${RESET}"
    exit 1
 fi
 
 if [[ \$1 == "-a" ]] && [ ! -z \$2 ]; then
    ADDR="\$2"
    echo -e "\${GREEN}Address: \$2\${RESET}"
-   sed -i 's/\"wallet\".*/\"wallet\": [\"'\${ADDR}'\"],/ig' config.txt
-fi
-
-if grep -q -wi ".*your-mining.*" \$DIR/config.txt; then
-   echo -e "\${RED}Error: Address is not set"
-   echo -e "\${RED}Set your address with ./metapool-run.sh -a <your address> or in \$DIR/config.txt\${RESET}"
+   sed -i 's/\"wallet\".*/\"wallet\": [\"'\${ADDR}'\"],/ig' \$DIR/bzminer${BZMINER_VERSION}/config.txt
+else
+   echo -e "\${RED}No address set. Run ./metapool-run.sh -a <your address>\${RESET}"
    exit 1
 fi
 
+if grep -q -wi ".*your-mining.*" \$DIR/bzminer${BZMINER_VERSION}/config.txt; then
+   echo -e "\${RED}Error: Address is not set"
+   echo -e "\${RED}Set your address with ./metapool-run.sh -a <your address> or in \$DIR/bzminer${BZMINER_VERSION}/config.txt\${RESET}"
+   exit 1
+fi
 
-
-wait
+cd $DIR/bzminer${BZMINER_VERSION}
+./bzminer -c config.txt
 
 EOT
 
-cd $BZMINER_FOLDER
-chmod +x  metapool-run.sh
+chmod +x metapool-run.sh
 
-if grep -q -wi ".*your-mining.*" config.txt; then
+if grep -q -wi ".*your-mining.*" ${BZMINER_FOLDER}/config.txt; then
    echo -e "${YELLOW}Set your address with ./metapool-run.sh -a <your address>${RESET}"
    echo -e ""
 fi
 
 echo -e "${GREEN}Welcome to https://metapool.tech, join us on Telegram https://t.me/metapool1"
-echo -e "${GREEN}Run $DIR/metapool-run.sh to mine${RESET}"
+echo -e "${GREEN}Run $DIR/metapool-run.sh -a <your address> to mine${RESET}"
+
 
