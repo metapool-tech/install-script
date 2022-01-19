@@ -63,7 +63,7 @@ cat <<EOT > ${BZMINER_FOLDER}/config.txt
     "log_file": "",
     "nvidia_only": false,
     "amd_only": false,
-    "auto_detect_lhr": true,
+    "auto_detect_lhr": false,
     "lock_config": false,
     "advanced_config": false,
     "advanced_display_config": false,
