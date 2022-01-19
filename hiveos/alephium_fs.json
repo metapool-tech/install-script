@@ -1,5 +1,5 @@
 {
-  "_version": "1.1.0",
+  "_version": "1.1.1",
   "isFavorite": false,
   "items": [
     {
@@ -11,10 +11,10 @@
       "miner_alt": "alephium",
       "miner_config": {
         "url": "eu.metapool.tech",
-        "algo": "blake",
+        "algo": "blake3-alph",
         "miner": "alephium",
         "template": "%WAL%",
-        "install_url": "https://gitlab.com/public-alephium/hiveos-custom/-/raw/main/packages/alephium-1.30.tar.gz"
+        "install_url": "https://gitlab.com/public-alephium/hiveos-custom/-/raw/main/packages/alephium-1.32.tar.gz"
       },
       "pool_geo": []
     }
