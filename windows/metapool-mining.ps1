@@ -1,18 +1,5 @@
-[version]$mining_stack_installer_version='0.1.0'
-$randomPort = Get-Random -Minimum 49152  -Maximum 65535
-
-
-$config = @"
-{
-    "logPath": "./logs/",
-    "diff1TargetNumZero": 30,
-    "serverHost": "eu.metapool.tech",
-    "serverPort": 20032,
-    "proxyPort": $randomPort,
-    "address": "your-mining-address"
-}
-"@
-$config = (ConvertFrom-Json $config)
+[version]$mining_stack_installer_version='0.2.0'
+$ADDRESS=""
 
 $runMiner = @"
 cd `$PSScriptRoot
@@ -46,7 +33,7 @@ if (`$cmd){
 }
 
 
-if (!(Test-Path "`$PSScriptRoot\config.json" -PathType Leaf)){
+if (!(Test-Path "`$PSScriptRoot\config.txt" -PathType Leaf)){
 	Write-Host "Error, pool configuration file could not be found"
 	Write-Host "Press any key to exit..."
 	`$Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
@@ -54,7 +41,7 @@ if (!(Test-Path "`$PSScriptRoot\config.json" -PathType Leaf)){
 }
 
 `$ErrorActionPreference= 'silentlycontinue'
-`$pool_cfg=Get-Content "`$PSScriptRoot\config.json" | ConvertFrom-Json -ErrorAction SilentlyContinue
+`$pool_cfg=Get-Content "`$PSScriptRoot\config.txt" | ConvertFrom-Json -ErrorAction SilentlyContinue
 if (`$pool_cfg -eq `$null){
 	Write-Host "Error, pool configuration file is corrupted"
 	Write-Host "Press any key to exit..."
@@ -62,110 +49,143 @@ if (`$pool_cfg -eq `$null){
 	Exit
 }
 `$ErrorActionPreference= 'continue'
-`$mining_address=`$pool_cfg.address
-if (`$mining_address -eq "your-mining-address"){
-	Write-Host "Error, your mining address was not properly set in the file ``"config.json``"."
-	Write-Host "Press any key to exit..."
-	`$Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-	Exit
-	}
 
-`$proxy_pid=`$null
-`$miner_pid=`$null
-# Use try-finally to kill the miner automatically when the script stops (ctrl+c only)
-try{
-	while(`$true){
-		# if we don't have an associated PID, spawn the proxy and wait 3 seconds to ensure it started properly
-		if (`$proxy_pid -eq `$null){
-			`$proxy_pid = (Start-Process "`$PSScriptRoot\alephium-mining-proxy.exe" -PassThru).ID
-			Start-Sleep -Seconds 3
-		}
-		
-		# if we don't have an associated PID, spawn the miner and wait 10 seconds to ensure it started mining properly
-		if (`$miner_pid -eq `$null){
-			`$miner_pid = (Start-Process "`$PSScriptRoot\alephium-gpu-miner.exe" "-p $randomPort" -PassThru).ID
-			Start-Sleep -Seconds 10
-		}
-		
-		# Check if the proxy process died
-		if (-not (Get-Process -Id `$proxy_pid -ErrorAction SilentlyContinue)) {
-			Write-Host "Proxy died, restarting it..."
-			`$proxy_pid=`$null
-			continue
-		}
-		
-		# Check if the miner process died
-		if (-not (Get-Process -Id `$miner_pid -ErrorAction SilentlyContinue)) {
-			Write-Host "Miner died, restarting it..."
-			`$miner_pid=`$null
-			continue
-		}
-		
-
-		# Sleep 10 seconds before checking again
-		Start-Sleep -Seconds 10
-	}
+if (((Get-Content "`$PSScriptRoot\config.txt" | ConvertFrom-Json).pool_configs -eq `$null) -or
+   ((Get-Content "`$PSScriptRoot\config.txt" | ConvertFrom-Json).pool_configs[0] -eq `$null) -or
+   ((Get-Content "`$PSScriptRoot\config.txt" | ConvertFrom-Json).pool_configs[0].wallet -eq `$null) -or
+   ((Get-Content "`$PSScriptRoot\config.txt" | ConvertFrom-Json).pool_configs[0].wallet -eq "your-mining-address")){
+    Write-Host "Error, wallet address can't be found, or is invalid"
+    Write-Host "Press any key to exit..."
+    `$Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+    Exit
 }
-finally
-{
-	if (`$proxy_pid -ne `$null) {
-		Stop-Process -Id `$proxy_pid -ErrorAction SilentlyContinue
-	}
-	
-	if (`$miner_pid -ne `$null) {
-		Stop-Process -Id `$miner_pid -ErrorAction SilentlyContinue
-	}
-}
+Start-Process -Wait -NoNewWindow -FilePath "`$PSScriptRoot\bzminer.exe" -ArgumentList "-c", "`$PSScriptRoot\config.txt"
 "@
-
-
 
 Write-Output "Thank you for mining with Metapool !"
 Write-Output ""
 
-$isNvidia = (Get-WmiObject win32_VideoController).Description.StartsWith("NVIDIA")
-
-if($isNvidia) {
-   Write-Output "Detected Nvidia gpu, downloading appropriate miner."
-   $ProgressPreference = 'SilentlyContinue'
-   Invoke-WebRequest -Uri "https://github.com/alephium/gpu-miner/releases/download/v0.5.4/alephium-0.5.4-cuda-miner-windows.exe" -OutFile "alephium-gpu-miner.exe"
-   $ProgressPreference = 'Continue'
-   Write-Output "Done."
-}else {
-   Write-Output "Detected unknown gpu, assuming it's AMD, downloading appropriate miner."
-   $ProgressPreference = 'SilentlyContinue'
-   Invoke-WebRequest -Uri "https://github.com/alephium/amd-miner/releases/download/v0.2.0/alephium-0.2.0-amd-miner-windows.exe" -OutFile "alephium-gpu-miner.exe"
-   $ProgressPreference = 'Continue'
-   Write-Output "Done."
+#Code from https://stackoverflow.com/a/21422517
+function DownloadFile($url, $targetFile)
+{
+   $uri = New-Object "System.Uri" "$url"
+   $request = [System.Net.HttpWebRequest]::Create($uri)
+   $request.set_Timeout(15000) #15 second timeout
+   $response = $request.GetResponse()
+   $totalLength = [System.Math]::Floor($response.get_ContentLength()/1024)
+   $responseStream = $response.GetResponseStream()
+   try {
+        $targetStream = New-Object -TypeName System.IO.FileStream -ArgumentList $targetFile, Create
+   } catch {
+        Write-warning "Error, can't write to $targetFile, probably open in another process"
+        Exit
+   }
+   $buffer = new-object byte[] 50KB
+   $count = $responseStream.Read($buffer,0,$buffer.length)
+   $downloadedBytes = $count
+   while ($count -gt 0)
+   {
+       $targetStream.Write($buffer, 0, $count)
+       $count = $responseStream.Read($buffer,0,$buffer.length)
+       $downloadedBytes = $downloadedBytes + $count
+       Write-Progress -activity "Downloading file '$($url.split('/') | Select -Last 1)'" -status "Downloaded ($([System.Math]::Round($downloadedBytes/1024/1024, 2))M of $([System.Math]::Round($totalLength/1024,2))M): " -PercentComplete ((([System.Math]::Floor($downloadedBytes/1024)) / $totalLength)  * 100)
+   }
+   Write-Progress -activity "Finished downloading file '$($url.split('/') | Select -Last 1)'"
+   $targetStream.Flush()
+   $targetStream.Close()
+   $targetStream.Dispose()
+   $responseStream.Dispose()
 }
 
-Write-Output "Downloading mining proxy. (could take a minute)"
-$ProgressPreference = 'SilentlyContinue'
-Invoke-WebRequest -Uri "https://github.com/alephium/mining-proxy/releases/download/v1.1.0/alephium-mining-proxy-1.1.0-windows.exe" -OutFile "alephium-mining-proxy.exe"
-$ProgressPreference = 'Continue'
-Write-Output "Done."
-Write-Output ""
-Set-Content -Path .\metapool-run.ps1 -Value $runMiner
-Set-Content -Path .\metapool-run.cmd -Value @"
-powershell -ExecutionPolicy Bypass -File %~dp0\metapool-run.ps1
-EXIT /b 0
+$DELETE_REF=$false
+# If the old ref miner is present
+if ((Test-Path ".\alephium-gpu-miner.exe" -PathType Leaf) -or
+    (Test-Path ".\alephium-mining-proxy.exe" -PathType Leaf) -or
+    (Test-Path ".\config.json" -PathType Leaf)){
+    Write-Output "Remaining parts of reference Alephium miner installation were found."
+    Write-Output "Proceeding with the installation will remove the reference miner, and replace it with Bzminer."
+    $decision = Read-Host 'Do you wish to proceed ? [Y/n]'
+    if ($decision -ne 'n') {
+        Write-Host 'Continuing installation...'
+        if ((Test-Path "config.json" -PathType Leaf) -and
+            !((Get-Content "config.json" | ConvertFrom-Json -ErrorAction SilentlyContinue) -eq $null) -and
+            !((Get-Content "config.json" | ConvertFrom-Json).address -eq $null) -and
+            !((Get-Content "config.json" | ConvertFrom-Json).address -eq "your-mining-address")){
+                Write-Host "Existing wallet configuration found, keeping it..."
+                $ADDRESS = (Get-Content "config.json" | ConvertFrom-Json).address
+        }
+
+        $DELETE_REF=$true
+    } else  {
+        Write-Host 'Installation canceled !'
+        Exit
+    }
+} else {
+    # Otherwise see if we can load the address from the config.txt of Bzminer
+    if((Test-Path "config.txt" -PathType Leaf) -and
+       !((Get-Content "config.txt" | ConvertFrom-Json -ErrorAction SilentlyContinue) -eq $null) -and
+       !((Get-Content "config.txt" | ConvertFrom-Json).pool_configs -eq $null) -and
+       !((Get-Content "config.txt" | ConvertFrom-Json).pool_configs[0] -eq $null) -and
+       !((Get-Content "config.txt" | ConvertFrom-Json).pool_configs[0].wallet -eq $null) -and
+       !((Get-Content "config.txt" | ConvertFrom-Json).pool_configs[0].wallet -eq "your-mining-address")){
+            Write-Host "Existing wallet configuration found, keeping it..."
+            $ADDRESS = (Get-Content "config.txt" | ConvertFrom-Json).pool_configs[0].wallet
+    }
+}
+
+Write-host -NoNewline "Downloading Bzminer version 7.2.0 ..."
+DownloadFile "https://www.bzminer.com/downloads/bzminer_v7.2.0_windows.zip" "./bzminer.zip"
+Write-host "Done."
+Write-host -NoNewline "Extracting miner..."
+Add-Type -Assembly System.IO.Compression.FileSystem
+$zip = [IO.Compression.ZipFile]::OpenRead("./bzminer.zip")
+$zip.Entries | where {$_.Name -like 'bzminer.exe' -or $_.Name -like 'bzminercore.dll'} | foreach {[System.IO.Compression.ZipFileExtensions]::ExtractToFile($_, $_.Name, $true)}
+$zip.Dispose()
+Write-host "Done."
+if ([string]::IsNullOrEmpty($ADDRESS)){
+    $ADDRESS = Read-Host 'Please enter your wallet address'
+}
+
+Write-host -NoNewline "Cleaning up files..."
+if($DELETE_REF){
+    try{
+    Remove-Item -LiteralPath "alephium-mining-proxy.exe" -Force
+    } catch {}
+    try{
+    Remove-Item -LiteralPath "alephium-gpu-miner.exe" -Force
+    }  catch {}
+    try{
+    Remove-Item -LiteralPath "config.json" -Force
+    } catch {}
+}
+Remove-Item -LiteralPath "./bzminer.zip" -Force
+Write-host "Done."
+
+$config = @"
+{
+    "pool_configs": [{
+            "algorithm": "alph",
+            "wallet": [ "$ADDRESS" ],
+            "url": ["stratum+tcp://eu.metapool.tech:20032"],
+            "username": "worker_name",
+            "lhr_only": false
+        }],
+    "pool": [0],
+    "rig_name": "rig",
+    "log_file": "",
+    "nvidia_only": false,
+    "amd_only": false,
+    "auto_detect_lhr": false,
+    "lock_config": false,
+    "advanced_config": false,
+    "advanced_display_config": false,
+    "device_overrides": []
+}
 "@
 
-# If there is an existing configuration, try to use its addresses
-$ErrorActionPreference= 'silentlycontinue'
-if ((Test-Path ".\config.json" -PathType Leaf)){
-	$existing_cfg = Get-Content ".\config.json" | ConvertFrom-Json -ErrorAction SilentlyContinue
-	# Automatic migration from multi-address
-	if ([bool]($existing_cfg -ne $null -and $existing_cfg.PSobject.Properties.name -match 'addresses' -eq 'addresses')){
-		$config.address = $existing_cfg.addresses[0]
-	}
-	if ([bool]($existing_cfg -ne $null -and $existing_cfg.PSobject.Properties.name -match 'address' -eq 'address')){
-		$config.address= $existing_cfg.address
-	}
-}
-$ErrorActionPreference= 'continue'
+Set-Content -Path .\metapool-run.ps1 -Value $runMiner
+Set-Content -Path .\metapool-run.cmd -Value "powershell -ExecutionPolicy Bypass -File %~dp0\metapool-run.ps1"
 
-Set-Content -Path .\config.json -Value (ConvertTo-Json $config)
+Set-Content -Path .\config.txt -Value $config
 
-Write-Output "To get started, you must first edit the file `"config.json`", and insert your mining address."
-Write-Output "Afterward, you can simply start mining with Metapool by using the `"metapool-run.ps1`" powershell script, or the `"metapool-run.cmd`" helper"
+Write-host "To get started mining with Metapool.tech, you can use the `"metapool-run.ps1`" powershell script, or the `"metapool-run.cmd`" helper"
