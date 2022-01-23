@@ -165,7 +165,7 @@ $config = @"
 {
     "pool_configs": [{
             "algorithm": "alph",
-            "wallet": [ "$ADDRESS" ],
+            "wallet": "$ADDRESS",
             "url": ["stratum+tcp://eu.metapool.tech:20032"],
             "username": "worker_name",
             "lhr_only": false
