@@ -1,4 +1,4 @@
-[version]$mining_stack_installer_version='0.2.0'
+[version]$mining_stack_installer_version='0.2.1'
 $ADDRESS=""
 
 $runMiner = @"
@@ -133,13 +133,13 @@ if ((Test-Path ".\alephium-gpu-miner.exe" -PathType Leaf) -or
     }
 }
 
-Write-host -NoNewline "Downloading Bzminer version 7.2.0 ..."
-DownloadFile "https://www.bzminer.com/downloads/bzminer_v7.2.0_windows.zip" "./bzminer.zip"
+Write-host -NoNewline "Downloading Bzminer version 7.2.2 ..."
+DownloadFile "https://github.com/bzminer/bzminer/releases/download/v7.2.2/bzminer_v7.2.2_windows_cuda_tk.zip" "./bzminer.zip"
 Write-host "Done."
 Write-host -NoNewline "Extracting miner..."
 Add-Type -Assembly System.IO.Compression.FileSystem
 $zip = [IO.Compression.ZipFile]::OpenRead("./bzminer.zip")
-$zip.Entries | where {$_.Name -like 'bzminer.exe' -or $_.Name -like 'bzminercore.dll'} | foreach {[System.IO.Compression.ZipFileExtensions]::ExtractToFile($_, $_.Name, $true)}
+$zip.Entries | where {$_.Name -like 'bzminer.exe' -or $_.Name -like 'bzminercore.dll' -or $_.Name -like 'nvrtc64_112_0.dll' -or $_.Name -like 'nvrtc-builtins64_112.dll'} | foreach {[System.IO.Compression.ZipFileExtensions]::ExtractToFile($_, $_.Name, $true)}
 $zip.Dispose()
 Write-host "Done."
 if ([string]::IsNullOrEmpty($ADDRESS)){
@@ -166,7 +166,7 @@ $config = @"
     "pool_configs": [{
             "algorithm": "alph",
             "wallet": "$ADDRESS",
-            "url": ["stratum+tcp://eu.metapool.tech:20032"],
+            "url": ["stratum+tcp://pool.metapool.tech:20032"],
             "username": "worker_name",
             "lhr_only": false
         }],
